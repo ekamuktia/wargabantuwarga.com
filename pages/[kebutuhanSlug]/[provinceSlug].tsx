@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { ContactList } from "~/components/contact-list";
 import { BackButton } from "~/components/layout/back-button";
 import { Page } from "~/components/layout/page";
@@ -11,18 +10,17 @@ import { getKebabCase } from "~/lib/string-utils";
 
 import { GetStaticPaths, GetStaticProps } from "next";
 
-interface ContactProvince extends Contact {
-  provinsi: string;
-}
-
-type KebutuhanProps = {
+type KebutuhanProvinceProps = {
   kebutuhan: string;
   kebutuhanSlug: string;
-  contactList: ContactProvince[];
+  provinceName: string;
+  provinceSlug: string;
+  contactList: Contact[];
 };
 
-export default function KebutuhanPage(props: KebutuhanProps) {
-  const { kebutuhan, kebutuhanSlug, contactList } = props;
+export default function KebutuhanProvincePage(props: KebutuhanProvinceProps) {
+  const { kebutuhan, kebutuhanSlug, provinceName, provinceSlug, contactList } =
+    props;
   const [
     filteredContacts,
     handleSubmitKeywords,
@@ -42,7 +40,7 @@ export default function KebutuhanPage(props: KebutuhanProps) {
       "tambahan_informasi",
       "bentuk_verifikasi",
     ],
-    aggregationSettings: [{ field: "provinsi", title: "Provinsi" }],
+    aggregationSettings: [{ field: "lokasi", title: "Lokasi" }],
     sortSettings: {
       verified_first: {
         field: ["verifikasi", "penyedia"],
@@ -50,21 +48,24 @@ export default function KebutuhanPage(props: KebutuhanProps) {
       },
     },
     defaultSort: "verified_first",
-    routeParam: true,
   });
 
   return (
     <Page>
       <PageHeader
-        backButton={<BackButton href="/" />}
+        backButton={<BackButton href={`/${kebutuhanSlug}`} />}
         breadcrumbs={[
           {
             name: kebutuhan,
             href: `/${kebutuhanSlug}`,
+          },
+          {
+            name: provinceName,
+            href: `/${kebutuhanSlug}/${provinceSlug}`,
             current: true,
           },
         ]}
-        title={kebutuhan}
+        title={`${kebutuhan} di ${provinceName}`}
       />
       <PageContent>
         <SearchForm
@@ -79,8 +80,8 @@ export default function KebutuhanPage(props: KebutuhanProps) {
         <ContactList
           data={filteredContacts}
           isLoading={isLoading}
-          provinceName={kebutuhan}
-          provinceSlug={kebutuhanSlug}
+          provinceName={provinceName}
+          provinceSlug={provinceSlug}
         />
       </PageContent>
     </Page>
@@ -90,12 +91,19 @@ export default function KebutuhanPage(props: KebutuhanProps) {
 const kebutuhanList = ["Donor plasma", "Oksigen"];
 
 export const getStaticPaths: GetStaticPaths = () => {
-  const paths = kebutuhanList.map((kebutuhan) => {
-    const kebutuhanSlug = getKebabCase(kebutuhan);
-
-    return {
-      params: { kebutuhanSlug },
+  const paths: {
+    params: {
+      kebutuhanSlug: string;
+      provinceSlug: string;
     };
+  }[] = [];
+  kebutuhanList.forEach((kebutuhan) => {
+    provinces.forEach((province) => {
+      const provinceSlug = province.slug;
+      paths.push({
+        params: { kebutuhanSlug: getKebabCase(kebutuhan), provinceSlug },
+      });
+    });
   });
 
   return {
@@ -105,33 +113,28 @@ export const getStaticPaths: GetStaticPaths = () => {
 };
 
 export const getStaticProps: GetStaticProps = ({ params = {} }) => {
-  const { kebutuhanSlug } = params;
+  const { kebutuhanSlug, provinceSlug } = params;
   const kebutuhan = kebutuhanList.find(
     (cur) => getKebabCase(cur) == kebutuhanSlug,
   );
-  let contactList: ContactProvince[] = [];
-  if (kebutuhan) {
-    contactList = provinces
-      .reduce((acc: ContactProvince[], province) => {
-        province.data.forEach((cur) => {
-          if (cur.kebutuhan == kebutuhan) {
-            acc.push({ ...cur, provinsi: province.name } as ContactProvince);
-          }
-        });
-        return acc;
-      }, [])
-      .sort((a, b) => {
-        return (
-          b.verifikasi - a.verifikasi ||
-          (a.penyedia ?? "").localeCompare(b.penyedia ?? "")
-        );
-      });
-  }
-
+  const province = provinces.find((prov) => prov.slug === provinceSlug);
+  const provinceName = province ? province.name : "";
+  const contactList = province
+    ? [...province.data]
+        .filter((cur) => cur.kebutuhan == kebutuhan)
+        .sort((a, b) => {
+          return (
+            b.verifikasi - a.verifikasi ||
+            (a.penyedia ?? "").localeCompare(b.penyedia ?? "")
+          );
+        })
+    : null;
   return {
     props: {
       kebutuhan,
       kebutuhanSlug,
+      provinceName,
+      provinceSlug,
       contactList,
     },
   };

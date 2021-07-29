@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { getQueryParams } from "../string-utils";
+import { getKebabCase, getQueryParams } from "../string-utils";
 
 import ItemsJS from "itemsjs";
 import Router from "next/router";
@@ -16,12 +16,14 @@ export function useSearch<T = unknown[]>({
   aggregationSettings,
   sortSettings,
   defaultSort,
+  routeParam,
 }: {
   items: T[];
   fieldNames: string[];
   aggregationSettings?: AggregationSetting[];
   sortSettings?: {};
   defaultSort?: string;
+  routeParam?: boolean;
 }) {
   const configuration: any = {
     searchableFields: fieldNames,
@@ -83,6 +85,7 @@ export function useSearch<T = unknown[]>({
 
     if (updateUrl) {
       const queryParams: string[] = [];
+      let queryPath: string = "";
       const { query, filters, sort } = searchParams;
       const urlParams: { [key: string]: string } = getQueryParams(
         window.location.search,
@@ -101,7 +104,11 @@ export function useSearch<T = unknown[]>({
         Object.keys(filters as {}).forEach((filter) => {
           if (filters[filter].length) {
             const filterValue = filters[filter][0];
-            queryParams.push(`${filter}=${filterValue}`);
+            if (routeParam) {
+              queryPath = getKebabCase(filterValue as string);
+            } else {
+              queryParams.push(`${filter}=${filterValue}`);
+            }
           }
         });
       }
@@ -110,6 +117,7 @@ export function useSearch<T = unknown[]>({
       }
       const newPath =
         window.location.pathname +
+        (queryPath ? `/${queryPath}` : "") +
         (queryParams.length ? `?${queryParams.join("&")}` : "");
       void Router.push(newPath, undefined, { shallow: true });
     }
